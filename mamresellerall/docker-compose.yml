@@ -1,0 +1,12 @@
+services:
+  mamsell:
+    build: .
+    container_name: mamsell
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./mamreseller.db:/app/mamreseller.db

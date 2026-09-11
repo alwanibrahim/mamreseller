@@ -1,0 +1,2 @@
+[konektor vexoran] listening on http://localhost:3004
+[Bun.serve]: request timed out after 10 seconds. Pass `idleTimeout` to configure.

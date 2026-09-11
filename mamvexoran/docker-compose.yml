@@ -1,0 +1,12 @@
+services:
+  mamvexoran:
+    build: .
+    container_name: mamvexoran
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    env_file: .env
+    environment:
+      PORT: "3004"
+    volumes:
+      - ./konektor.db:/app/konektor.db

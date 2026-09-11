@@ -1,0 +1,12 @@
+services:
+  mamwarzone:
+    build: .
+    container_name: mamwarzone
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file: .env
+    environment:
+      PORT: "3003"
+    volumes:
+      - ./konektor.db:/app/konektor.db

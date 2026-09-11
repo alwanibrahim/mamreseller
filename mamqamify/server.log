@@ -1,0 +1,2 @@
+[konektor qamify] listening on http://localhost:3001
+[Bun.serve]: request timed out after 10 seconds. Pass `idleTimeout` to configure.
