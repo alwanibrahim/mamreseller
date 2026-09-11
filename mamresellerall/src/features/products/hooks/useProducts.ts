@@ -11,6 +11,8 @@ export type Product = {
   supplier_id: string;
   supplier_name: string;
   active: boolean;
+  profit_percent: number;
+  sell_price: number;
 };
 
 type Result = { products: Product[]; failures: { supplier_name: string; error: string }[] };

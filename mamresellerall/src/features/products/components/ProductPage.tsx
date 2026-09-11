@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -48,6 +57,36 @@ export function ProductPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ supplier_id: string; id: string; name: string; profit: number } | null>(null);
+  const [profitInput, setProfitInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  function openProfitModal(p: { supplier_id: string; id: string; name: string; profit_percent?: number }) {
+    setEditing({ supplier_id: p.supplier_id, id: p.id, name: p.name, profit: p.profit_percent ?? 0 });
+    setProfitInput(String(p.profit_percent ?? 0));
+    setSaveError(null);
+  }
+
+  async function saveProfit() {
+    if (!editing) return;
+    const pct = Number(profitInput);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 1000) {
+      setSaveError("Isi angka 0–1000.");
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await apiFetch("/api/products", post("/api/products", { supplier_id: editing.supplier_id, product_id: editing.id, profit_percent: pct }));
+      setEditing(null);
+      await reload();
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Gagal menyimpan profit.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function toggleActive(p: { supplier_id: string; id: string; active: boolean }) {
     setToggling(`${p.supplier_id}-${p.id}`);
@@ -123,6 +162,8 @@ export function ProductPage() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>Harga</TableHead>
+                <TableHead>Harga Jual</TableHead>
+                <TableHead>Profit %</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Orderable</TableHead>
                 <TableHead>Aktif</TableHead>
@@ -144,6 +185,18 @@ export function ProductPage() {
                     )}
                   </TableCell>
                   <TableCell>{fmtUSD.format(p.price)}</TableCell>
+                  <TableCell className="font-medium">
+                    {fmtUSD.format(p.sell_price ?? p.price)}
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      className="rounded px-2 py-1 text-sm underline-offset-4 hover:bg-muted hover:underline"
+                      onClick={() => openProfitModal(p)}
+                      title="Klik untuk atur profit %"
+                    >
+                      {p.profit_percent ? `${p.profit_percent}%` : <span className="text-muted-foreground">atur…</span>}
+                    </button>
+                  </TableCell>
                   <TableCell>{p.stock === -1 ? "service" : p.stock}</TableCell>
                   <TableCell className="text-right">
                     {p.orderable ? <Badge>ya</Badge> : <Badge variant="secondary">tidak</Badge>}
@@ -215,6 +268,44 @@ export function ProductPage() {
           </Pagination>
         )}
       </CardContent>
+
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Profit %</DialogTitle>
+            <DialogDescription className="line-clamp-2">
+              {editing?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="profit-input">Profit (%)</Label>
+            <Input
+              id="profit-input"
+              type="number"
+              min={0}
+              max={1000}
+              step="0.5"
+              value={profitInput}
+              onChange={(e) => setProfitInput(e.target.value)}
+              placeholder="mis. 10"
+              onKeyDown={(e) => e.key === "Enter" && void saveProfit()}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Harga jual member = harga asli + profit ini. Contoh: $10 + 10% = $11.
+            </p>
+            {saveError && <p className="text-sm text-destructive">{saveError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+              Batal
+            </Button>
+            <Button onClick={() => void saveProfit()} disabled={saving}>
+              {saving ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

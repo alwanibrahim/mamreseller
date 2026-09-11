@@ -13,6 +13,20 @@ CREATE TABLE IF NOT EXISTS product_overrides (
   PRIMARY KEY (supplier_id, product_id)
 );
 `);
+// migrasi: kolom profit_percent (abaikan error kalau sudah ada)
+try { db.exec("ALTER TABLE product_overrides ADD COLUMN profit_percent REAL NOT NULL DEFAULT 0"); } catch {}
+
+// markup jual per produk: harga member = harga supplier + profit %
+export function productProfit(supplierId: string, productId: string): number {
+  const r = db.query("SELECT profit_percent FROM product_overrides WHERE supplier_id = ? AND product_id = ?")
+    .get(supplierId, productId) as any;
+  const n = Number(r?.profit_percent ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export function sellPrice(price: number, profitPercent: number): number {
+  return Math.round(price * (1 + profitPercent / 100) * 100) / 100;
+}
 
 // default aktif — override opsional
 export function isProductActive(supplierId: string, productId: string): boolean {
@@ -41,14 +55,17 @@ export const productRoutes = {
       const strip = (p: any) => (isAdmin ? p : { ...p, supplier_name: undefined });
       const products = results.flatMap(({ s, r }) =>
         r.ok
-          ? (r.body?.data?.products ?? []).map((p: any) =>
-              strip({
+          ? (r.body?.data?.products ?? []).map((p: any) => {
+              const profit = productProfit(s.id, String(p.id));
+              return strip({
                 ...p,
                 supplier_id: s.id,
                 supplier_name: s.name,
                 active: isProductActive(s.id, String(p.id)),
-              }),
-            )
+                profit_percent: profit,
+                sell_price: sellPrice(Number(p.price ?? 0), profit),
+              });
+            })
           : [],
       );
       const failures = results
@@ -72,9 +89,23 @@ export const productRoutes = {
       const supplier_id = String(body?.supplier_id ?? "");
       const product_id = String(body?.product_id ?? "");
       if (!supplier_id || !product_id) return fail("bad_request", "supplier_id dan product_id wajib");
-      if (typeof body?.active !== "boolean") return fail("bad_request", "active wajib boolean");
-      db.query("INSERT OR REPLACE INTO product_overrides (supplier_id, product_id, active) VALUES (?,?,?)")
-        .run(supplier_id, product_id, body.active ? 1 : 0);
+      const hasActive = typeof body?.active === "boolean";
+      const hasProfit = body?.profit_percent !== undefined;
+      if (!hasActive && !hasProfit) return fail("bad_request", "active (boolean) atau profit_percent (number) wajib");
+      let profit = 0;
+      if (hasProfit) {
+        profit = Number(body.profit_percent);
+        if (!Number.isFinite(profit) || profit < 0 || profit > 1000)
+          return fail("bad_request", "profit_percent harus angka 0–1000");
+      }
+      // pertahankan nilai field yang tidak dikirim
+      const existing = db.query("SELECT active, profit_percent FROM product_overrides WHERE supplier_id = ? AND product_id = ?")
+        .get(supplier_id, product_id) as any;
+      const active = hasActive ? body.active : !existing || !!existing.active;
+      if (!hasProfit) profit = Number(existing?.profit_percent ?? 0);
+      db.query("INSERT OR REPLACE INTO product_overrides (supplier_id, product_id, active, profit_percent) VALUES (?,?,?,?)")
+        .run(supplier_id, product_id, active ? 1 : 0, profit);
+      return ok({ supplier_id, product_id, active, profit_percent: profit });
       return ok({ supplier_id, product_id, active: body.active });
     },
   },

@@ -2,7 +2,7 @@
 import { findSupplier, listSuppliers } from "../supplier/server";
 import { errMessage, konektorGet } from "@/lib/server/konektor";
 import { currentUser } from "@/features/auth/server";
-import { isProductActive } from "@/features/products/server";
+import { isProductActive, productProfit, sellPrice } from "@/features/products/server";
 import { addTransaction, getTransaction, updateTransaction, walletBalance } from "@/lib/server/wallet";
 import { findPendingPayment } from "@/features/payment/server";
 
@@ -67,9 +67,10 @@ export const orderRoutes = {
       if (findPendingPayment(user.id))
         return fail("payment_pending", "pending transaction exists, go to /dashboard/orders to cancel it first", 409);
 
-      // pre-check saldo pakai harga produk dari konektor
+      // pre-check saldo pakai harga jual produk (harga konektor + profit %)
       const pr = await konektorGet(s, `/products/${encodeURIComponent(String(product_id))}`);
-      const price = pr.ok ? Number(pr.body?.data?.product?.price ?? 0) : 0;
+      const basePrice = pr.ok ? Number(pr.body?.data?.product?.price ?? 0) : 0;
+      const price = sellPrice(basePrice, productProfit(s.id, String(product_id)));
       const required = price * quantity;
       const saldo = walletBalance(user.id);
       if (saldo < required)
