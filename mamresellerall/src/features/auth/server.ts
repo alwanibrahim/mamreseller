@@ -38,6 +38,13 @@ function getCookie(req: Request, name: string): string | null {
   return null;
 }
 
+// origin asli dari client — Traefik terminate TLS, jadi ikut X-Forwarded-Proto/Host
+function reqOrigin(req: Request): string {
+  const proto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ?? new URL(req.url).host;
+  return `${proto ?? "http"}://${host}`;
+}
+
 function findUser(id: string) {
   return db.query("SELECT id, name, email, role, created_at FROM users WHERE id = ?").get(id) as any;
 }
@@ -105,7 +112,7 @@ export const authRoutes = {
     async GET(req: Request) {
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET)
         return redirect("/login?error=google_belum_dikonfigurasi");
-      const origin = new URL(req.url).origin;
+      const origin = reqOrigin(req);
       const state = randomToken();
       const authorize = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       authorize.searchParams.set("client_id", GOOGLE_CLIENT_ID);
@@ -129,7 +136,7 @@ export const authRoutes = {
       if (!code || !state || state !== getCookie(req, "oauth_state"))
         return redirect("/login?error=state_tidak_valid");
       try {
-        const origin = url.origin;
+        const origin = reqOrigin(req);
         const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
