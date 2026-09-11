@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -39,6 +41,17 @@ type Row = {
   description: string;
 };
 
+const STATUS_OPTIONS = [
+  "menunggu admin prosess",
+  "pending",
+  "processing",
+  "delivered",
+  "success",
+  "paid",
+  "failed",
+  "cancelled",
+];
+
 export function AdminOrderBuyerPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +59,32 @@ export function AdminOrderBuyerPage() {
   const [supplierBalance, setSupplierBalance] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  // modal ubah status
+  const [statusRow, setStatusRow] = useState<Row | null>(null);
+  const [statusInput, setStatusInput] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  function openStatusModal(r: Row) {
+    setStatusRow(r);
+    setStatusInput(r.status ?? "processing");
+    setStatusError(null);
+  }
+
+  async function saveStatus() {
+    if (!statusRow) return;
+    setSavingStatus(true);
+    setStatusError(null);
+    try {
+      await apiFetch("/api/admin/order-buyer/status", post("/api/admin/order-buyer/status", { kind: statusRow.kind, system_id: statusRow.system_id, status: statusInput }));
+      setStatusRow(null);
+      await reload();
+    } catch (e) {
+      setStatusError(e instanceof Error ? e.message : "gagal mengubah status");
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   const reload = useCallback(async () => {
     try {
@@ -159,9 +198,17 @@ export function AdminOrderBuyerPage() {
                         {fmtUSD.format(r.amount)}
                       </TableCell>
                       <TableCell>
-                        {r.status === "menunggu admin prosess" ? (
-                          <Badge className="bg-amber-500 text-white">menunggu admin prosess</Badge>
-                        ) : statusBadge(r.status)}
+                        <button
+                          className="rounded px-1 py-0.5 underline-offset-4 hover:bg-muted hover:underline"
+                          onClick={() => openStatusModal(r)}
+                          title="Klik untuk ubah status"
+                        >
+                          {r.status === "menunggu admin prosess" ? (
+                            <Badge className="bg-amber-500 text-white">menunggu admin prosess</Badge>
+                          ) : (
+                            statusBadge(r.status)
+                          )}
+                        </button>
                       </TableCell>
                       <TableCell>
                         {r.mode ? (
@@ -255,6 +302,42 @@ export function AdminOrderBuyerPage() {
                 <Link to="/dashboard/admin/balance">Deposite</Link>
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal ubah status */}
+      <Dialog open={!!statusRow} onOpenChange={(v) => !v && setStatusRow(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ubah status</DialogTitle>
+            <DialogDescription className="line-clamp-2">
+              {statusRow?.buyer} · {statusRow?.description} · {statusRow?.system_id}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="status-select">Status</Label>
+            <Select value={statusInput} onValueChange={setStatusInput}>
+              <SelectTrigger id="status-select">
+                <SelectValue placeholder="Pilih status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {statusError && <p className="text-sm text-destructive">{statusError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusRow(null)} disabled={savingStatus}>
+              Batal
+            </Button>
+            <Button onClick={() => void saveStatus()} disabled={savingStatus || statusInput === statusRow?.status}>
+              {savingStatus ? "Menyimpan..." : "Simpan"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -44,12 +44,12 @@ export function MemberProductsPage() {
     );
   }, [products, query]);
 
-  // otomatis jika saldo supplier (admin) cukup untuk harga produk; selain itu manual
-  const modeOf = (p: { supplier_id: string; price: number }): "loading" | "otomatis" | "manual" | "unknown" => {
+  // otomatis jika saldo supplier (admin) cukup untuk harga jual produk; selain itu manual
+  const modeOf = (p: { supplier_id: string; price: number; sell_price?: number }): "loading" | "otomatis" | "manual" | "unknown" => {
     const b = balanceBySupplier.get(p.supplier_id);
     if (!b || b.status === "loading") return "loading";
     if (b.status === "error" || b.value === null) return "unknown";
-    return Number(b.value) >= Number(p.price) ? "otomatis" : "manual";
+    return Number(b.value) >= Number(p.sell_price ?? p.price) ? "otomatis" : "manual";
   };
 
   return (
@@ -113,13 +113,13 @@ export function MemberProductsPage() {
                               {p.description ?? "No description."}
                             </p>
                             <p className="text-xs">
-                              Price {fmtUSD.format(p.price)} · stock {p.stock === -1 ? "service" : p.stock}
+                              Price {fmtUSD.format(p.sell_price ?? p.price)} · stock {p.stock === -1 ? "service" : p.stock}
                             </p>
                           </div>
                         </HoverCardContent>
                       </HoverCard>
                     </TableCell>
-                    <TableCell>{fmtUSD.format(p.price)}</TableCell>
+                    <TableCell className="font-medium">{fmtUSD.format(p.sell_price ?? p.price)}</TableCell>
                     <TableCell>{p.stock === -1 ? "service" : p.stock}</TableCell>
                     <TableCell>
                       {mode === "loading" ? (

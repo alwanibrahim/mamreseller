@@ -1,7 +1,7 @@
 // Member area: data per-supplier (render inkremental) + dompet member
 import { Database } from "bun:sqlite";
 import { findSupplier } from "../supplier/server";
-import { isProductActive } from "@/features/products/server";
+import { isProductActive, productProfit, sellPrice } from "@/features/products/server";
 import { konektorGet } from "@/lib/server/konektor";
 import { addTransaction, listMembers, listTransactions, walletBalance } from "@/lib/server/wallet";
 import { currentUser } from "@/features/auth/server";
@@ -35,12 +35,17 @@ export const memberRoutes = {
       const s = r1.supplier;
       const r = await konektorGet(s, "/products");
       if (!r.ok) return Response.json(r.body ?? failBody("supplier unreachable"), { status: r.status ?? 502 });
-      const products = (r.body.data.products ?? []).map((p: any) => ({
-        ...p,
-        supplier_id: s.id,
-        supplier_name: s.name,
-        active: isProductActive(s.id, String(p.id)),
-      }));
+      const products = (r.body.data.products ?? []).map((p: any) => {
+        const profit = productProfit(s.id, String(p.id));
+        return {
+          ...p,
+          supplier_id: s.id,
+          supplier_name: s.name,
+          active: isProductActive(s.id, String(p.id)),
+          profit_percent: profit,
+          sell_price: sellPrice(Number(p.price ?? 0), profit),
+        };
+      });
       return ok({ products });
     },
   },

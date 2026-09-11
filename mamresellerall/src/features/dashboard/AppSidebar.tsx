@@ -1,4 +1,5 @@
-import { ClipboardList, LayoutDashboard, Package, ReceiptText, ShoppingCart, Store, User, Users, Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ClipboardList, LayoutDashboard, MessageCircle, Package, ReceiptText, ShoppingCart, Store, User, Users, Wallet } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,17 +15,19 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/features/auth/auth";
+import { apiFetch } from "@/lib/api";
 import { initials } from "@/features/member/member";
 
 type Item = { title: string; url: string; icon: typeof Package; end: boolean };
 
-// Sidebar member: 4 menu
+// Sidebar member: menu + Bantuan (halaman kontak WA)
 const memberItems: Item[] = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard, end: true },
   { title: "Products", url: "/dashboard/products", icon: Package, end: false },
   { title: "Balance", url: "/dashboard/saldo", icon: Wallet, end: false },
   { title: "Orders", url: "/dashboard/orders", icon: ShoppingCart, end: false },
   { title: "Profile", url: "/dashboard/profile", icon: User, end: false },
+  { title: "Help", url: "/dashboard/bantuan", icon: MessageCircle, end: false },
 ];
 
 // Sidebar admin: Overview paling atas + menu lain
@@ -38,9 +41,27 @@ const adminItems: Item[] = [
   { title: "Order Buyer", url: "/dashboard/admin/order-buyer", icon: ReceiptText, end: false },
 ];
 
+const ORDER_BUYER_URL = "/dashboard/admin/order-buyer";
+
 function SidebarShell({ label, items }: { label: string; items: Item[] }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
+  // badge jumlah order manual "menunggu admin prosess" — hanya untuk menu Order Buyer (admin)
+  const [pendingBuyer, setPendingBuyer] = useState(0);
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    const load = () =>
+      apiFetch<{ count: number }>("/api/admin/order-buyer/pending")
+        .then((d) => alive && setPendingBuyer(d.count))
+        .catch(() => undefined);
+    load();
+    const t = setInterval(load, 30000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [isAdmin]);
   return (
     <Sidebar>
       <SidebarHeader>
@@ -61,6 +82,11 @@ function SidebarShell({ label, items }: { label: string; items: Item[] }) {
                     >
                       <item.icon />
                       <span>{item.title}</span>
+                      {item.url === ORDER_BUYER_URL && pendingBuyer > 0 && (
+                        <Badge variant="destructive" className="ml-auto shrink-0">
+                          {pendingBuyer}
+                        </Badge>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

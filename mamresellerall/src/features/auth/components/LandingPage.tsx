@@ -16,6 +16,7 @@ type Product = {
   id: string;
   name: string;
   price: number;
+  sell_price?: number;
   stock: number;
   orderable: boolean;
   active: boolean;
@@ -94,7 +95,7 @@ export function LandingPage() {
                   <CardTitle className="text-base">{p.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1">
-                  <p className="text-lg font-semibold">{fmtUSD.format(p.price)}</p>
+                  <p className="text-lg font-semibold">{fmtUSD.format(p.sell_price ?? p.price)}</p>
                   <p className="text-xs text-muted-foreground">
                     {p.stock === -1 ? "stok service" : `stok ${p.stock}`}
                   </p>
@@ -143,7 +144,7 @@ function LandingBuyDialog({
   const [payment, setPayment] = useState<QrisPayment | null>(null);
   const [paid, setPaid] = useState<OrderResult | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const required = Number(product.price) * Number(qty || 0);
+  const required = Number(product.sell_price ?? product.price) * Number(qty || 0);
 
   const stopPolling = () => {
     if (timer.current) {
@@ -172,7 +173,7 @@ function LandingBuyDialog({
     try {
       const p = await apiFetch<QrisPayment>(
         "/api/payment/qris",
-        post("/api/payment/qris", { amount: Number(product.price) * q }),
+        post("/api/payment/qris", { amount: Number(product.sell_price ?? product.price) * q }),
       );
       setPayment(p);
     } catch (err) {
@@ -238,7 +239,7 @@ function LandingBuyDialog({
         <DialogHeader>
           <DialogTitle>Buy {product.name}</DialogTitle>
           <DialogDescription>
-            {fmtUSD.format(product.price)}/unit
+            {fmtUSD.format(product.sell_price ?? product.price)}/unit
           </DialogDescription>
         </DialogHeader>
         {paid ? (

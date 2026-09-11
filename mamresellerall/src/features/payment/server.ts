@@ -236,6 +236,47 @@ export const paymentRoutes = {
     },
   },
 
+  // Badge sidebar: jumlah order manual yang menunggu admin prosess
+  "/api/admin/order-buyer/pending": {
+    async GET(req: Request) {
+      const user = currentUser(req);
+      if (!user) return fail("unauthorized", "please sign in", 401);
+      if (user.role !== "admin") return fail("forbidden", "admin only", 403);
+      const r = db
+        .query("SELECT COUNT(*) AS c FROM transactions WHERE type = 'order' AND mode = 'manual' AND status = 'menunggu admin prosess'")
+        .get() as any;
+      return ok({ count: Number(r?.c ?? 0) });
+    },
+  },
+
+  // Ubah status manual oleh admin (order produk / top up saldo)
+  "/api/admin/order-buyer/status": {
+    async POST(req: Request) {
+      const user = currentUser(req);
+      if (!user) return fail("unauthorized", "please sign in", 401);
+      if (user.role !== "admin") return fail("forbidden", "admin only", 403);
+      let body: any;
+      try { body = await req.json(); } catch { return fail("bad_request", "invalid json body"); }
+      const kind = String(body?.kind ?? "");
+      const system_id = String(body?.system_id ?? "");
+      const status = String(body?.status ?? "");
+      const allowed = ["menunggu admin prosess", "pending", "processing", "delivered", "success", "paid", "failed", "cancelled"];
+      if (!allowed.includes(status))
+        return fail("bad_request", `status harus salah satu dari: ${allowed.join(", ")}`);
+      if (kind === "order_product") {
+        const r = db.query("UPDATE transactions SET status = ? WHERE id = ? AND type = 'order'").run(status, system_id);
+        if (r.changes === 0) return fail("not_found", "transaksi tidak ditemukan", 404);
+        return ok({ kind, system_id, status });
+      }
+      if (kind === "add_balance") {
+        const r = db.query("UPDATE payments SET status = ?, updated_at = ? WHERE id = ?").run(status, new Date().toISOString(), system_id);
+        if (r.changes === 0) return fail("not_found", "payment tidak ditemukan", 404);
+        return ok({ kind, system_id, status });
+      }
+      return fail("bad_request", "kind tidak dikenal");
+    },
+  },
+
   // Webhook AutoGopay → app. Daftarkan {origin}/api/payment/webhook di dashboard AutoGopay.
   "/api/payment/webhook": {
     async POST(req: Request) {

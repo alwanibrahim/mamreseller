@@ -17,6 +17,7 @@ import { MemberOverviewPage } from "@/features/member/components/MemberOverviewP
 import { MemberProductsPage } from "@/features/member/components/MemberProductsPage";
 import { MemberSaldoPage } from "@/features/member/components/MemberSaldoPage";
 import { MemberOrdersPage } from "@/features/member/components/MemberOrdersPage";
+import { BantuanPage } from "@/features/member/components/BantuanPage";
 import { ProfilePage } from "@/features/member/components/ProfilePage";
 
 export function App() {
@@ -65,6 +66,14 @@ export function App() {
             element={
               <RoleRoute allow={["member", "admin"]}>
                 <ProfilePage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="bantuan"
+            element={
+              <RoleRoute allow={["member", "admin"]}>
+                <BantuanPage />
               </RoleRoute>
             }
           />

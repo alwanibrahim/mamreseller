@@ -43,7 +43,8 @@ export function MemberBuyDialog({ product }: Props) {
   const [payStatus, setPayStatus] = useState<"pending" | "paid" | "expire">("pending");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const required = Number(product.price) * Number(qty || 0);
+  const unitPrice = Number(product.sell_price ?? product.price);
+  const required = unitPrice * Number(qty || 0);
   const saldoCukup = balance !== null && Number(balance) >= required;
   const stopPolling = () => {
     if (timer.current) {
@@ -161,7 +162,7 @@ export function MemberBuyDialog({ product }: Props) {
           <DialogHeader>
             <DialogTitle>Buy {product.name}</DialogTitle>
             <DialogDescription>
-              Price {fmtUSD.format(product.price)}/unit
+              Price {fmtUSD.format(product.sell_price ?? product.price)}/unit
             </DialogDescription>
           </DialogHeader>
           {done ? (
